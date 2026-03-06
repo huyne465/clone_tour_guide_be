@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import * as mm from 'music-metadata';
 import { CreatePoiDto } from './dto/create-poi.dto';
 import { UpdatePoiDto } from './dto/update-poi.dto';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -16,6 +17,42 @@ export class PoiService {
 
     if (error) throw new InternalServerErrorException(error.message);
     return data[0];
+  }
+
+  async uploadAudio(file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('File is missing');
+
+    let duration = 0;
+    try {
+      const metadata = await mm.parseBuffer(file.buffer, file.mimetype);
+      duration = Math.floor(metadata.format.duration || 0);
+    } catch (e) {
+      throw new InternalServerErrorException('Error parsing audio duration: ' + e.message);
+    }
+
+    const fileExt = file.originalname.split('.').pop();
+    const fileName = `${Date.now()}-${Math.round(Math.random() * 10E5)}.${fileExt}`;
+    const { data, error } = await this.supabaseService.getClient()
+      .storage
+      .from('pois-audio')
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new InternalServerErrorException('Failed to upload file: ' + error.message);
+    }
+
+    const { data: publicUrlData } = this.supabaseService.getClient()
+      .storage
+      .from('pois-audio')
+      .getPublicUrl(fileName);
+
+    return {
+      audio_url: publicUrlData.publicUrl,
+      duration: duration,
+    };
   }
 
   async findAll(floorId?: string) {

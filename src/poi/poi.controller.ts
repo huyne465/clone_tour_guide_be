@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { PoiService } from './poi.service';
 import { CreatePoiDto } from './dto/create-poi.dto';
 import { UpdatePoiDto } from './dto/update-poi.dto';
@@ -10,6 +11,12 @@ export class PoiController {
   @Post()
   create(@Body() createPoiDto: CreatePoiDto) {
     return this.poiService.create(createPoiDto);
+  }
+
+  @Post('upload-audio')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadAudio(@UploadedFile() file: Express.Multer.File) {
+    return this.poiService.uploadAudio(file);
   }
 
   @Get()
